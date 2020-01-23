@@ -1,7 +1,10 @@
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/core.hpp>
+//#include <opencv2/imgproc.hpp>
+#include <opencv2/calib3d.hpp>
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/cudaimgproc.hpp>
+#include <opencv2/cudawarping.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -42,7 +45,6 @@ double D[4] = {-0.32653103,  0.08570291, -0.00523793, -0.00647632};
 
 Mat cameraMatrix = Mat(3, 3, CV_64FC1, &K);
 Mat distCoeffs = Mat(4, 1, CV_64FC1, &D);
-
 
 // Debug image type
 string type2str(int type) {
@@ -109,12 +111,9 @@ void white_balance(Mat& src, Mat& dist){
 }
 
 int main(){
-
-
-
 	cout<<"Initialization of Camera"<<endl;
 	int fd;
-	fd = open("/dev/video0", O_RDWR);
+	fd = open("/dev/video1", O_RDWR);
 	if (fd < 0){
 		fd = open("/dev/video4", O_RDWR);
 		//perror("Failed to open device, OPEN");
@@ -143,9 +142,9 @@ int main(){
 	// Setup camera parameters
 	v4l2_control ctl;
 	ctl.id = V4L2_CID_GAIN;
-	ctl.value = 20;
+	ctl.value = 64;
 	ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-	ctl.value = 100;
+	ctl.value = 500;
 
 	if (ioctl(fd, VIDIOC_S_CTRL, &ctl) < 0){
 		perror("Device could not set controls, VIDIOC_S_CTRL");
@@ -221,6 +220,14 @@ int main(){
 	char full_name[70];
 
 	cout<<"Start Streaming"<<endl;
+	
+	// Initialize map for undistortion
+	Mat mapx, mapy;
+	cuda::GpuMat mapx_gpu, mapy_gpu;
+	fisheye::initUndistortRectifyMap(::cameraMatrix, ::distCoeffs, cv::Matx33d::eye(), ::cameraMatrix, cv::Size(height, width), CV_32FC1, mapx, mapy);
+	mapx_gpu.upload(mapx);
+	mapy_gpu.upload(mapy);
+	
 	/***************************Loop***************************/
 	while (true){
 		// Queue the buffer
@@ -237,24 +244,30 @@ int main(){
 		}
 
 		//cout<<"convert buffer to Mat"<<endl;
-		Mat image_buffer(height, width, CV_16UC1);
-		memcpy(image_buffer.data, &buffer[0], width*height*sizeof(uint16_t)); // only first channel will be copied to the Mat image_buffer
+		Mat frame_bayer_16bit(height, width, CV_16UC1);
+		memcpy(frame_bayer_16bit.data, &buffer[0], width*height*sizeof(uint16_t)); // only first channel will be copied to the Mat image_buffer
 
 		//cout<<"convert 16 bit to 8 bit"<<endl;
-		Mat frame_bayer_8bit(height, width, CV_8UC1);
-		image_buffer.convertTo(frame_bayer_8bit, CV_8UC1);
+		cuda::GpuMat frame_bayer_16bit_gpu(height, width, CV_16UC1);
+		frame_bayer_16bit_gpu.upload(frame_bayer_16bit);
+		cuda::GpuMat frame_bayer_8bit_gpu(height, width, CV_8UC1);
+		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1, 0.00390625);
 
 		//cout<<"convert BGGR to BGR"<<endl;
-		Mat frame_distorted(height, width, CV_8UC3);
-		cvtColor(frame_bayer_8bit, frame_distorted, COLOR_BayerBG2BGR);
+		cuda::GpuMat frame_distorted_gpu(height, width, CV_8UC3);
+		cuda::cvtColor(frame_bayer_8bit_gpu, frame_distorted_gpu, COLOR_BayerBG2BGR);
 
 		//cout<<"Undistort frame"<<endl;
-		//Mat frame_undistorted(height, width, CV_8UC3);
-		//fisheye::undistortImage(frame_distorted, frame_undistorted, cameraMatrix, distCoeffs, cameraMatrix);
-
+		cuda::GpuMat frame_undistorted_gpu(height, width, CV_8UC3);
+		cuda::remap(frame_distorted_gpu, frame_undistorted_gpu, mapx_gpu, mapy_gpu, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+		
+		// Debug Section
+		Mat frame_undistorted;
+		frame_undistorted_gpu.download(frame_undistorted);
+		
 		namedWindow("Fisheye", CV_WINDOW_NORMAL);
 		resizeWindow("Fisheye", width/2, height/2);
-		imshow("Fisheye", frame_distorted);
+		imshow("Fisheye", frame_undistorted);
 
 		/* Your Code here */
             
@@ -272,7 +285,7 @@ int main(){
 			//sprintf(full_name, "/home/xihui/vision/gps/calibration/calib_img_%d.jpg", index);
 			sprintf(full_name, "/home/steven/Desktop/v4l2_camera/calibration/calib_img_%d.jpg", index);
 			cout<<full_name<<endl;
-			imwrite(full_name, frame_distorted);
+			imwrite(full_name, frame_undistorted);
 			index++;
 		}
 		else{
