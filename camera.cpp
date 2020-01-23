@@ -251,7 +251,7 @@ int main(){
 		cuda::GpuMat frame_bayer_16bit_gpu(height, width, CV_16UC1);
 		frame_bayer_16bit_gpu.upload(frame_bayer_16bit);
 		cuda::GpuMat frame_bayer_8bit_gpu(height, width, CV_8UC1);
-		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1, 0.00390625);
+		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1);
 
 		//cout<<"convert BGGR to BGR"<<endl;
 		cuda::GpuMat frame_distorted_gpu(height, width, CV_8UC3);
