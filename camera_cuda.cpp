@@ -30,18 +30,11 @@ using namespace std;
 
 int width = 1920;
 int height = 1080;
-/*
-double K[9] = { 9.0325136355107918e+02, 0, 1.3755634776456659e+03, 0 ,
-				9.0295296602633675e+02, 9.6835485779963028e+02,
-				0, 0, 1};*/
+
 double K[9] = { 278.8518, 0, 323.7384172, 0 ,
 				273.17860196, 225.88590556,
 				0, 0, 1};
-
-//double D[4] = {-2.5271302020456785e-02, 6.1158058615096191e-03, -7.5600183621223269e-03, 1.8123937152019329e-03};
 double D[4] = {-0.32653103,  0.08570291, -0.00523793, -0.00647632};
-
-//last {-0.32653103,  0.08570291,  0.03115511, -0.00523793, -0.00647632}
 
 Mat cameraMatrix = Mat(3, 3, CV_64FC1, &K);
 Mat distCoeffs = Mat(4, 1, CV_64FC1, &D);
@@ -54,7 +47,7 @@ int main(){
 	fd = open("/dev/video1", O_RDWR);
 	if (fd < 0){
 		fd = open("/dev/video4", O_RDWR);
-		//perror("Failed to open device, OPEN");
+		perror("Failed to open device, OPEN");
 	}
 
 	// Retrieve the device's capabilities
