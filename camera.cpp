@@ -30,18 +30,11 @@ using namespace std;
 
 int width = 1920;
 int height = 1080;
-/*
-double K[9] = { 9.0325136355107918e+02, 0, 1.3755634776456659e+03, 0 ,
-				9.0295296602633675e+02, 9.6835485779963028e+02,
-				0, 0, 1};*/
+
 double K[9] = { 278.8518, 0, 323.7384172, 0 ,
 				273.17860196, 225.88590556,
 				0, 0, 1};
-
-//double D[4] = {-2.5271302020456785e-02, 6.1158058615096191e-03, -7.5600183621223269e-03, 1.8123937152019329e-03};
 double D[4] = {-0.32653103,  0.08570291, -0.00523793, -0.00647632};
-
-//last {-0.32653103,  0.08570291,  0.03115511, -0.00523793, -0.00647632}
 
 Mat cameraMatrix = Mat(3, 3, CV_64FC1, &K);
 Mat distCoeffs = Mat(4, 1, CV_64FC1, &D);
@@ -54,7 +47,7 @@ int main(){
 	fd = open("/dev/video1", O_RDWR);
 	if (fd < 0){
 		fd = open("/dev/video4", O_RDWR);
-		//perror("Failed to open device, OPEN");
+		perror("Failed to open device, OPEN");
 	}
 
 	// Retrieve the device's capabilities
@@ -161,10 +154,7 @@ int main(){
 	
 	// Initialize map for undistortion
 	Mat mapx, mapy;
-	cuda::GpuMat mapx_gpu, mapy_gpu;
 	fisheye::initUndistortRectifyMap(::cameraMatrix, ::distCoeffs, cv::Matx33d::eye(), ::cameraMatrix, cv::Size(height, width), CV_32FC1, mapx, mapy);
-	mapx_gpu.upload(mapx);
-	mapy_gpu.upload(mapy);
 	
 	/***************************Loop***************************/
 	while (true){
@@ -187,21 +177,19 @@ int main(){
 
 		//cout<<"convert 16 bit to 8 bit"<<endl;
 		Mat frame_bayer_8bit(height, width, CV_8UC1);
-		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1);
+		frame_bayer_16bit.convertTo(frame_bayer_8bit, CV_8UC1);
 
 		//cout<<"convert BGGR to BGR"<<endl;
-		cuda::GpuMat frame_distorted_gpu(height, width, CV_8UC3);
-		cuda::cvtColor(frame_bayer_8bit_gpu, frame_distorted_gpu, COLOR_BayerBG2BGR);
+		Mat frame_distorted(height, width, CV_8UC3);
+		cvtColor(frame_bayer_8bit, frame_distorted, COLOR_BayerBG2BGR);
 
 		//cout<<"Undistort frame"<<endl;
-		cuda::GpuMat frame_undistorted_gpu(height, width, CV_8UC3);
-		cuda::remap(frame_distorted_gpu, frame_undistorted_gpu, mapx_gpu, mapy_gpu, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+		Mat frame_undistorted(height, width, CV_8UC3);
+		remap(frame_distorted, frame_undistorted, mapx, mapy, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 		
-		// Debug Section
+		// Debug Original Frame
 		if (debug_frame == 1)
 		{
-			Mat frame_distorted;
-			frame_distorted_gpu.download(frame_distorted);
 			namedWindow("Fisheye", CV_WINDOW_NORMAL);
 			resizeWindow("Fisheye", width/2, height/2);
 			imshow("Fisheye", frame_distorted);
