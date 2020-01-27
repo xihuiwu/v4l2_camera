@@ -1,5 +1,5 @@
 # v4l2_camera
-This is the repository that used for bulk v4l2 driver.
+This is the repository that used bulk v4l2 driver to grab frame from the camera.
 
 # Useful V4l2 Camera Control IDs
 The control IDs should be chosen based on your camera available settings.
