@@ -2,6 +2,7 @@
 This is the repository that used for bulk v4l2 driver.
 
 # Useful V4l2 Camera Control IDs
+The control IDs should be chosen based on your camera available settings.
 | Contorl ID                  |Description                              |
 |-----------------------------|:----------------------------------------|
 | V4L2_CID_BRIGHTNESS         | Picture brightnes                       |
