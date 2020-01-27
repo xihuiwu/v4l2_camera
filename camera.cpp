@@ -25,7 +25,7 @@ using namespace std;
 
 /*
  *Available resolutions are
- *     1936 x 1100
+ *     1920 x 1080
  */
 
 int width = 1920;
@@ -46,69 +46,7 @@ double D[4] = {-0.32653103,  0.08570291, -0.00523793, -0.00647632};
 Mat cameraMatrix = Mat(3, 3, CV_64FC1, &K);
 Mat distCoeffs = Mat(4, 1, CV_64FC1, &D);
 
-// Debug image type
-string type2str(int type) {
-  string r;
-
-  uchar depth = type & CV_MAT_DEPTH_MASK;
-  uchar chans = 1 + (type >> CV_CN_SHIFT);
-
-  switch ( depth ) {
-    case CV_8U:  r = "8U"; break;
-    case CV_8S:  r = "8S"; break;
-    case CV_16U: r = "16U"; break;
-    case CV_16S: r = "16S"; break;
-    case CV_32S: r = "32S"; break;
-    case CV_32F: r = "32F"; break;
-    case CV_64F: r = "64F"; break;
-    default:     r = "User"; break;
-  }
-
-  r += "C";
-  r += (chans+'0');
-
-  return r;
-}
-
-// white balance found online
-void SimplestCB(Mat& in, Mat& out, float percent){
-    assert(in.channels() == 3);
-    assert(percent > 0 && percent < 100);
-
-    float half_percent = percent / 200.0f;
-
-    vector<Mat> tmpsplit; split(in,tmpsplit);
-    for(int i=0;i<3;i++) {
-        //find the low and high precentile values (based on the input percentile)
-        Mat flat; tmpsplit[i].reshape(1,1).copyTo(flat);
-        cv::sort(flat,flat,CV_SORT_EVERY_ROW + CV_SORT_ASCENDING);
-        int lowval = flat.at<uchar>(cvFloor(((float)flat.cols) * half_percent));
-        int highval = flat.at<uchar>(cvCeil(((float)flat.cols) * (1.0 - half_percent)));
-        //cout << lowval << " " << highval << endl;
-        
-        //saturate below the low percentile and above the high percentile
-        tmpsplit[i].setTo(lowval,tmpsplit[i] < lowval);
-        tmpsplit[i].setTo(highval,tmpsplit[i] > highval);
-        
-        //scale the channel
-        normalize(tmpsplit[i],tmpsplit[i],0,255,NORM_MINMAX);
-    }
-    merge(tmpsplit,out);
-}
-
-void white_balance(Mat& src, Mat& dist){
-	Mat chs[3], temp;
-
-	cvtColor(src, temp, COLOR_BGR2Lab);
-	split(temp, chs);
-	Scalar avg_a = mean(chs[1]);
-	Scalar avg_b = mean(chs[2]);
-	chs[1] = chs[1] - ((avg_a.val[0] - 128)*(chs[0]/255)*1.1);
-	chs[2] = chs[2] - ((avg_b.val[0] - 128)*(chs[0]/255)*1.1);
-	vector<Mat> channels = {chs[0], chs[1], chs[2]};
-	merge(channels, temp);
-	cvtColor(temp, dist, COLOR_Lab2BGR);
-}
+bool debug_frame = 1;
 
 int main(){
 	cout<<"Initialization of Camera"<<endl;
@@ -142,9 +80,9 @@ int main(){
 	// Setup camera parameters
 	v4l2_control ctl;
 	ctl.id = V4L2_CID_GAIN;
-	ctl.value = 64;
+	ctl.value = 32;
 	ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-	ctl.value = 500;
+	ctl.value = 250;
 
 	if (ioctl(fd, VIDIOC_S_CTRL, &ctl) < 0){
 		perror("Device could not set controls, VIDIOC_S_CTRL");
@@ -262,21 +200,23 @@ int main(){
 		cuda::remap(frame_distorted_gpu, frame_undistorted_gpu, mapx_gpu, mapy_gpu, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 		
 		// Debug Section
-		Mat frame_undistorted;
-		frame_undistorted_gpu.download(frame_undistorted);
-		
-		namedWindow("Fisheye", CV_WINDOW_NORMAL);
-		resizeWindow("Fisheye", width/2, height/2);
-		imshow("Fisheye", frame_undistorted);
+		if (debug_frame == 1)
+		{
+			Mat frame_distorted;
+			frame_distorted_gpu.download(frame_distorted);
+			namedWindow("Fisheye", CV_WINDOW_NORMAL);
+			resizeWindow("Fisheye", width/2, height/2);
+			imshow("Fisheye", frame_distorted);
+			waitKey(30);
+		}
 
 		/* Your Code here */
             
 
 		/* End of Your Code */
 
-		int key = (waitKey(30) & 0xFF);
-
 		// press 'q' to end streaming
+		/*int key = (waitKey(30) & 0xFF);
 		if (key == 'q'){
 			break;
 		}
@@ -288,9 +228,8 @@ int main(){
 			imwrite(full_name, frame_undistorted);
 			index++;
 		}
-		else{
-			
-		}
+		else{}
+		*/
 	}
 
 	/***************************Loop End***************************/
