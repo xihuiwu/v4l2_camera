@@ -186,9 +186,7 @@ int main(){
 		memcpy(frame_bayer_16bit.data, &buffer[0], width*height*sizeof(uint16_t)); // only first channel will be copied to the Mat image_buffer
 
 		//cout<<"convert 16 bit to 8 bit"<<endl;
-		cuda::GpuMat frame_bayer_16bit_gpu(height, width, CV_16UC1);
-		frame_bayer_16bit_gpu.upload(frame_bayer_16bit);
-		cuda::GpuMat frame_bayer_8bit_gpu(height, width, CV_8UC1);
+		Mat frame_bayer_8bit(height, width, CV_8UC1);
 		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1);
 
 		//cout<<"convert BGGR to BGR"<<endl;
