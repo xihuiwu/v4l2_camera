@@ -5,6 +5,7 @@
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudaimgproc.hpp>
 #include <opencv2/cudawarping.hpp>
+#include <opencv2/cudaarithm.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -38,6 +39,10 @@ double D[4] = {-0.32653103,  0.08570291, -0.00523793, -0.00647632};
 
 Mat cameraMatrix = Mat(3, 3, CV_64FC1, &K);
 Mat distCoeffs = Mat(4, 1, CV_64FC1, &D);
+Mat frame_bayer_16bit(height, width, CV_16UC1);
+cuda::GpuMat frame_bayer_16bit_gpu(height, width, CV_16UC1);
+cuda::GpuMat frame_bayer_8bit_gpu(height, width, CV_8UC1);
+cuda::GpuMat frame_bgr_8bit_gpu(height, width, CV_8UC3);
 
 bool debug_frame = 1;
 
@@ -47,7 +52,7 @@ int main(){
 	fd = open("/dev/video1", O_RDWR);
 	if (fd < 0){
 		fd = open("/dev/video4", O_RDWR);
-		perror("Failed to open device, OPEN");
+		//perror("Failed to open device, OPEN");
 	}
 
 	// Retrieve the device's capabilities
@@ -75,23 +80,11 @@ int main(){
 	ctl.id = V4L2_CID_GAIN;
 	ctl.value = 32;
 	ctl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-	ctl.value = 250;
+	ctl.value = 1500;
 
 	if (ioctl(fd, VIDIOC_S_CTRL, &ctl) < 0){
 		perror("Device could not set controls, VIDIOC_S_CTRL");
 		return 1;
-	}
-	
-	// Set FPS
-	struct v4l2_streamparm *setfps;
-	setfps = (struct v4l2_streamparm *)calloc(1,sizeof(struct v4l2_streamparm));
-	memset(setfps,0,sizeof(struct v4l2_streamparm));
-	setfps->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	setfps->parm.capture.timeperframe.numerator = 1;
-	setfps->parm.capture.timeperframe.denominator = 30;
-	if(ioctl(fd, VIDIOC_S_PARM,setfps) < 0)
-	{
-		perror("Could not set fps");
 	}
 
 	// Request buffers from the device
@@ -175,18 +168,14 @@ int main(){
 		}
 
 		//cout<<"convert buffer to Mat"<<endl;
-		Mat frame_bayer_16bit(height, width, CV_16UC1);
-		memcpy(frame_bayer_16bit.data, &buffer[0], width*height*sizeof(uint16_t)); // only first channel will be copied to the Mat image_buffer
-
+		Mat frame_bayer_16bit(height, width, CV_16UC1, buffer);
+		
 		//cout<<"convert 16 bit to 8 bit"<<endl;
-		cuda::GpuMat frame_bayer_16bit_gpu(height, width, CV_16UC1);
 		frame_bayer_16bit_gpu.upload(frame_bayer_16bit);
-		cuda::GpuMat frame_bayer_8bit_gpu(height, width, CV_8UC1);
-		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1);
+		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1, 0.0605);
 
 		//cout<<"convert BGGR to BGR"<<endl;
-		cuda::GpuMat frame_distorted_gpu(height, width, CV_8UC3);
-		cuda::cvtColor(frame_bayer_8bit_gpu, frame_distorted_gpu, COLOR_BayerBG2BGR);
+		cuda::cvtColor(frame_bayer_8bit_gpu, frame_bgr_8bit_gpu, COLOR_BayerBG2BGR);
 
 		//cout<<"Undistort frame"<<endl;
 		cuda::GpuMat frame_undistorted_gpu(height, width, CV_8UC3);
@@ -196,7 +185,7 @@ int main(){
 		if (debug_frame == 1)
 		{
 			Mat frame_distorted;
-			frame_distorted_gpu.download(frame_distorted);
+			frame_bgr_8bit_gpu.download(frame_distorted);
 			namedWindow("Fisheye", CV_WINDOW_NORMAL);
 			resizeWindow("Fisheye", width/2, height/2);
 			imshow("Fisheye", frame_distorted);
@@ -209,12 +198,12 @@ int main(){
 		/* End of Your Code */
 
 		// press 'q' to end streaming
-		/*int key = (waitKey(30) & 0xFF);
+		int key = (waitKey(30) & 0xFF);
 		if (key == 'q'){
 			break;
 		}
 		// press 's' to save picture
-		else if (key == 's'){
+		/*else if (key == 's'){
 			//sprintf(full_name, "/home/xihui/vision/gps/calibration/calib_img_%d.jpg", index);
 			sprintf(full_name, "/home/steven/Desktop/v4l2_camera/calibration/calib_img_%d.jpg", index);
 			cout<<full_name<<endl;
