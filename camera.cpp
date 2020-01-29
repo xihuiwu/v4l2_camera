@@ -35,6 +35,8 @@ double D[4] = {-0.32653103,  0.08570291, -0.00523793, -0.00647632};
 
 Mat cameraMatrix = Mat(3, 3, CV_64FC1, &K);
 Mat distCoeffs = Mat(4, 1, CV_64FC1, &D);
+Mat frame_bayer_8bit(height, width, CV_8UC1);
+Mat frame_bgr_8bit(height, width, CV_8UC3);
 
 bool debug_frame = 1;
 
@@ -169,15 +171,12 @@ int main(){
 		}
 
 		//cout<<"convert buffer to Mat"<<endl;
-		Mat frame_bayer_16bit(height, width, CV_16UC1);
-		memcpy(frame_bayer_16bit.data, &buffer[0], width*height*sizeof(uint16_t)); // only first channel will be copied to the Mat image_buffer
-
+		Mat frame_bayer_16bit(height, width, CV_16UC1, buffer);
+		
 		//cout<<"convert 16 bit to 8 bit"<<endl;
-		Mat frame_bayer_8bit(height, width, CV_8UC1);
-		frame_bayer_16bit.convertTo(frame_bayer_8bit, CV_8UC1);
+		frame_bayer_16bit.convertTo(frame_bayer_8bit, CV_8UC1, 0.0625);
 
 		//cout<<"convert BGGR to BGR"<<endl;
-		Mat frame_distorted(height, width, CV_8UC3);
 		cvtColor(frame_bayer_8bit, frame_distorted, COLOR_BayerBG2BGR);
 
 		//cout<<"Undistort frame"<<endl;
