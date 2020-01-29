@@ -171,7 +171,7 @@ int main(){
 		
 		//cout<<"convert 16 bit to 8 bit"<<endl;
 		frame_bayer_16bit_gpu.upload(frame_bayer_16bit);
-		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1, 0.0605);
+		frame_bayer_16bit_gpu.convertTo(frame_bayer_8bit_gpu, CV_8UC1, 0.0625); // 0.0625=1/2^4
 
 		//cout<<"convert BGGR to BGR"<<endl;
 		cuda::cvtColor(frame_bayer_8bit_gpu, frame_bgr_8bit_gpu, COLOR_BayerBG2BGR);
