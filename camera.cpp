@@ -174,7 +174,7 @@ int main(){
 		Mat frame_bayer_16bit(height, width, CV_16UC1, buffer);
 		
 		//cout<<"convert 16 bit to 8 bit"<<endl;
-		frame_bayer_16bit.convertTo(frame_bayer_8bit, CV_8UC1, 0.0625);
+		frame_bayer_16bit.convertTo(frame_bayer_8bit, CV_8UC1, 0.0625); // 0.0625 = 1/2^4
 
 		//cout<<"convert BGGR to BGR"<<endl;
 		cvtColor(frame_bayer_8bit, frame_distorted, COLOR_BayerBG2BGR);
